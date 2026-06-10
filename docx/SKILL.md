@@ -45,10 +45,14 @@ python scripts/office/soffice.py --headless --convert-to docx document.doc
 # Text extraction with tracked changes
 pandoc --track-changes=all document.docx -o output.md
 
-# Full Markdown with all formatting
-pandoc document.docx -t markdown --wrap=none -o output.md
+# Raw XML access
+python scripts/office/unpack.py document.docx unpacked/
+```
 
-# Raw XML access — .docx is just a ZIP file
+<details>
+<summary>Fallback: read without scripts (Python stdlib only)</summary>
+
+```bash
 python -c "
 import zipfile, os
 os.makedirs('unpacked', exist_ok=True)
@@ -57,6 +61,7 @@ with zipfile.ZipFile('document.docx', 'r') as z:
 print('Unpacked to unpacked/')
 "
 ```
+</details>
 
 ### Converting to Images
 
@@ -73,7 +78,13 @@ To produce a clean document with all tracked changes accepted (requires LibreOff
 python scripts/accept_changes.py input.docx output.docx
 ```
 
-(Alternative without LibreOffice: `pandoc --track-changes=accept document.docx -o clean.md && pandoc clean.md -o clean.docx`)
+<details>
+<summary>Fallback: accept changes with pandoc (no LibreOffice required)</summary>
+
+```bash
+pandoc --track-changes=accept document.docx -o clean.md && pandoc clean.md -o clean.docx
+```
+</details>
 
 ---
 
@@ -618,9 +629,9 @@ Without the `<w:del/>` in `<w:pPr><w:rPr>`, accepting changes leaves an empty pa
 
 ---
 
-## Python Alternative: python-docx
+## Fallback: python-docx (simpler API, fewer features)
 
-For simpler editing tasks where raw XML is overkill, use `python-docx`:
+When the official XML editing pipeline is overkill for simple tasks, `python-docx` can be used as a lightweight fallback. It cannot handle tracked changes or comments.
 
 ```python
 from docx import Document
@@ -651,21 +662,29 @@ table.cell(0, 1).text = 'Header 2'
 doc.save('modified.docx')
 ```
 
-**When to use python-docx vs XML editing:**
-- python-docx: simple find-replace, adding paragraphs/tables, reading content
-- XML editing: tracked changes, comments, images, complex reformatting, preserving exact formatting
+**Official vs fallback:**
+| Task | Official (preferred) | Fallback (python-docx) |
+|------|---------------------|----------------------|
+| Create new document | docx-js (JS) | python-docx |
+| Edit content | XML editing (unpack→edit→pack) | python-docx API |
+| Tracked changes | XML `<w:ins>` / `<w:del>` | ❌ Not supported |
+| Comments | `scripts/comment.py` + XML | ❌ Not supported |
+| Simple find-replace | XML editing | ✅ python-docx |
+| Read/analyze | pandoc or unpack.py | ✅ python-docx |
 
 ---
 
 ## Dependencies
 
-| Tool | Purpose | Install |
-|------|---------|---------|
-| **docx** (npm) | Create new documents with docx-js | `npm install -g docx` |
-| **pandoc** | Text extraction, tracked changes, format conversion | `winget install pandoc` |
-| **python-docx** | Simple editing, content extraction | `pip install python-docx` |
-| **LibreOffice** (optional) | .doc conversion, PDF export | `winget install LibreOffice.LibreOffice` |
-| **poppler** (optional) | `pdftoppm` for page images | `winget install poppler` |
+- **pandoc**: Text extraction
+- **docx**: `npm install -g docx` (new documents)
+- **LibreOffice**: PDF conversion (auto-configured for sandboxed environments via `scripts/office/soffice.py`)
+- **Poppler**: `pdftoppm` for images
+
+### Fallback dependencies (optional)
+
+- **python-docx**: `pip install python-docx` — simple editing without XML manipulation
+- **pandoc** (also used as fallback for `accept_changes.py` when LibreOffice unavailable)
 
 ---
 
@@ -681,16 +700,8 @@ Current setup:
 
 ## Hermes Agent Usage
 
-This skill is a byte-for-byte adaptation of Anthropic's official [docx skill](https://github.com/anthropics/skills) (scripts included). 
+This skill is a byte-for-byte adaptation of Anthropic's official [docx skill](https://github.com/anthropics/skills) (scripts included). **All official scripts are the primary approach** — fallbacks (python-docx, pandoc) exist only for environments where LibreOffice or node are unavailable.
 
 **Load:** `/skill docx` or Hermes auto-detects from trigger keywords.
 
 **Scripts:** All official `scripts/` are included — `unpack.py`, `pack.py`, `soffice.py`, `validate.py`, `comment.py`, `accept_changes.py`, plus helpers and templates. They work identically to the Claude Code originals.
-
-**Python Alternative:** `python-docx` is also available for simpler tasks where raw XML editing is overkill.
-
-**Dependencies on Windows:**
-- `npm install -g docx` for docx-js
-- `winget install pandoc` for text extraction
-- `pip install python-docx` for simple editing
-- `winget install LibreOffice.LibreOffice` (optional) for .doc conversion and tracked changes acceptance
