@@ -1,24 +1,37 @@
-# Hermes Custom Skills / 定制技能备份
+# Hermes Custom Skills
 
-备份我修改过的 Hermes Agent 技能文件，防止被 `hermes skills update` 或版本升级覆盖。
+我的 Hermes Agent 定制技能备份 / My customized Hermes Agent skills backup.
 
-## 技能列表
-
-| 技能 | 说明 | 版本 | 改动 |
-|------|------|------|------|
-| ocr-and-documents | PDF/DOCX/XLSX 全流程（读/创/编/验） | v3.0 | 从内置 built-in 大幅升级 |
-
-## 升级内容（vs 原版）
-
-- **DOCX**: 新增 docx-js 创建、python-docx 编辑、pandoc 格式转换、交叉引用检测
-- **XLSX**: 新增 openpyxl 创建/编辑、pandas 数据分析、工程颜色规范、5 步验证流程
-- **PDF**: 新增 pypdf 表单/水印/加密、pdfplumber 表格提取
-
-对标 Anthropic 官方 skills，并在验证流程上超越。
-
-## 恢复方法
+## 安装 / Install
 
 ```bash
-# 覆盖 Hermes 内置版本
-cp ocr-and-documents.md ~/AppData/Local/hermes/skills/productivity/ocr-and-documents/SKILL.md
+# 添加技能源
+hermes skills tap add chenzhuyu2004/hermes-custom-skills
+
+# 安装所有技能
+hermes skills install deep-research --category academic-research
+hermes skills install academic-paper --category academic-research
+hermes skills install academic-paper-reviewer --category academic-research
+hermes skills install academic-pipeline --category academic-research
 ```
+
+## 技能列表 / Skills
+
+### academic-research 系列（改编自 [Imbad0202/academic-research-skills](https://github.com/Imbad0202/academic-research-skills)）
+
+| 技能 | 版本 | Agent | 模式 | 用途 |
+|------|------|-------|------|------|
+| `deep-research` | 2.9.4 | 13 | 7 | 深度学术研究（系统综述/元分析/苏格拉底引导） |
+| `academic-paper` | 3.2.0 | 12 | 10 | 论文写作（中英双语/LaTeX/DOCX/PDF） |
+| `academic-paper-reviewer` | 1.10.0 | 7 | 6 | 多视角同行审稿（EIC+3审稿人+魔鬼代言人） |
+| `academic-pipeline` | 3.12.0 | 5 | 10阶段 | 全流程编排（研究→写作→审查→修改→定稿） |
+
+### 其他技能
+
+| 技能 | 用途 |
+|------|------|
+| `ocr-and-documents` | OCR 识别 + PDF/DOCX/XLSX 文档处理 |
+
+## 共享资源 / Shared
+
+`shared/` 目录包含跨技能共享的协议、契约、模板和参考文件。
