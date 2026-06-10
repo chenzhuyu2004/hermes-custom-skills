@@ -25,18 +25,18 @@ A .docx file is a ZIP archive containing XML files. This skill covers creating n
 | Read/analyze content | `pandoc` or unpack for raw XML |
 | Create new document | Use `docx-js` (JavaScript) — see [Creating New Documents](#creating-new-documents) |
 | Edit existing document | Unpack → edit XML → repack — see [Editing Existing Documents](#editing-existing-documents) |
-| Accept tracked changes | `pandoc --track-changes=accept` |
+| Accept tracked changes | `python scripts/accept_changes.py` (requires LibreOffice) |
+
+> **Script path:** All `python scripts/...` commands use the official Anthropic scripts included with this skill.
+> In Hermes, the skill directory is `%LOCALAPPDATA%\hermes\skills\productivity\docx\`.
+> Run commands from that directory, or use the `$HERMES_SKILL_DIR` variable when available.
 
 ### Converting .doc to .docx
 
 Legacy `.doc` files must be converted before editing:
 
 ```bash
-# Option A: LibreOffice (requires installation)
-soffice --headless --convert-to docx document.doc
-
-# Option B: pandoc (may lose some formatting)
-pandoc document.doc -o document.docx
+python scripts/office/soffice.py --headless --convert-to docx document.doc
 ```
 
 ### Reading Content
@@ -61,25 +61,19 @@ print('Unpacked to unpacked/')
 ### Converting to Images
 
 ```bash
-# Convert to PDF first, then to images
-pandoc document.docx -o temp.pdf --pdf-engine=xelatex
-# Then use Poppler's pdftoppm, or:
-python -c "
-import pymupdf
-doc = pymupdf.open('temp.pdf')
-for i, page in enumerate(doc):
-    page.get_pixmap(dpi=150).save(f'page_{i+1}.jpg')
-"
+python scripts/office/soffice.py --headless --convert-to pdf document.docx
+pdftoppm -jpeg -r 150 document.pdf page
 ```
 
 ### Accepting Tracked Changes
 
+To produce a clean document with all tracked changes accepted (requires LibreOffice):
+
 ```bash
-# pandoc can accept changes during extraction
-pandoc --track-changes=accept document.docx -o clean.md
-# Then re-create DOCX from clean markdown
-pandoc clean.md -o clean.docx
+python scripts/accept_changes.py input.docx output.docx
 ```
+
+(Alternative without LibreOffice: `pandoc --track-changes=accept document.docx -o clean.md && pandoc clean.md -o clean.docx`)
 
 ---
 
@@ -109,12 +103,7 @@ Packer.toBuffer(doc).then(buffer => fs.writeFileSync("document.docx", buffer));
 After creating the file, validate it. If validation fails, unpack, fix the XML, and repack.
 
 ```bash
-# Quick validation: try to read with python-docx
-python -c "
-from docx import Document
-doc = Document('document.docx')
-print(f'OK: {len(doc.paragraphs)} paragraphs, {len(doc.tables)} tables')
-"
+python scripts/office/validate.py doc.docx
 ```
 
 ### Page Size
@@ -443,35 +432,10 @@ sections: [{
 ### Step 1: Unpack
 
 ```bash
-# .docx is a ZIP file — unpack with Python stdlib
-python -c "
-import zipfile, os, shutil
-src = 'document.docx'
-dst = 'unpacked'
-if os.path.exists(dst):
-    shutil.rmtree(dst)
-os.makedirs(dst)
-with zipfile.ZipFile(src, 'r') as z:
-    z.extractall(dst)
-
-# Pretty-print XML for readability
-from xml.dom import minidom
-for root, dirs, files in os.walk(dst):
-    for f in files:
-        if f.endswith('.xml'):
-            path = os.path.join(root, f)
-            try:
-                with open(path, 'r', encoding='utf-8') as fh:
-                    xml = fh.read()
-                dom = minidom.parseString(xml)
-                with open(path, 'w', encoding='utf-8') as fh:
-                    fh.write(dom.toprettyxml(indent='  '))
-            except:
-                pass  # skip binary-like XML
-
-print('Unpacked to unpacked/')
-"
+python scripts/office/unpack.py document.docx unpacked/
 ```
+
+Extracts XML, pretty-prints, merges adjacent runs, and converts smart quotes to XML entities (`&#x201C;` etc.) so they survive editing. Use `--merge-runs false` to skip run merging.
 
 ### Step 2: Edit XML
 
@@ -495,59 +459,30 @@ Edit files in `unpacked/word/`. See [XML Reference](#xml-reference) below for pa
 | `&#x201C;` | " (left double) |
 | `&#x201D;` | " (right double) |
 
-**Adding comments:** Edit the `word/comments.xml` file directly:
+**Adding comments:** Use `comment.py` to handle boilerplate across multiple XML files (text must be pre-escaped XML):
 
 ```bash
-# Use python-docx for easier comment insertion
-python -c "
-from docx import Document
-from docx.oxml.ns import qn
-from lxml import etree
-import datetime
-
-doc = Document('document.docx')
-# Add comment to first paragraph
-p = doc.paragraphs[0]
-comment_id = 0
-# Create comment element
-comments_part = doc.part.comments_part
-# ... (see python-docx docs for full comment API)
-doc.save('output.docx')
-"
+python scripts/comment.py unpacked/ 0 "Comment text with &amp; and &#x2019;"
+python scripts/comment.py unpacked/ 1 "Reply text" --parent 0  # reply to comment 0
+python scripts/comment.py unpacked/ 0 "Text" --author "Custom Author"  # custom author name
 ```
+
+Then add markers to document.xml (see Comments in XML Reference).
 
 ### Step 3: Pack
 
 ```bash
-# Repack the edited files into a new .docx
-python -c "
-import zipfile, os
-
-output = 'output.docx'
-dst = 'unpacked'
-
-with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as zout:
-    for root, dirs, files in os.walk(dst):
-        for f in files:
-            filepath = os.path.join(root, f)
-            arcname = os.path.relpath(filepath, dst)
-            zout.write(filepath, arcname)
-
-print(f'Packed to {output}')
-"
+python scripts/office/pack.py unpacked/ output.docx --original document.docx
 ```
 
-**If repacking fails to open in Word**, use python-docx to re-save:
+Validates with auto-repair, condenses XML, and creates DOCX. Use `--validate false` to skip.
 
-```bash
-python -c "
-from docx import Document
-# python-docx will fix many XML issues automatically
-doc = Document('document.docx')
-doc.save('output.docx')
-print('Re-saved with python-docx auto-repair')
-"
-```
+**Auto-repair will fix:**
+- `durableId` >= 0x7FFFFFFF (regenerates valid ID)
+- Missing `xml:space="preserve"` on `<w:t>` with whitespace
+
+**Auto-repair won't fix:**
+- Malformed XML, invalid element nesting, missing relationships, schema violations
 
 ### Common Pitfalls
 
@@ -746,12 +681,16 @@ Current setup:
 
 ## Hermes Agent Usage
 
-This skill was adapted from Anthropic's official [docx skill](https://github.com/anthropics/skills) to work with Hermes Agent.
+This skill is a byte-for-byte adaptation of Anthropic's official [docx skill](https://github.com/anthropics/skills) (scripts included). 
 
 **Load:** `/skill docx` or Hermes auto-detects from trigger keywords.
 
-**Key adaptations from original:**
-- Replaced Claude-specific `scripts/office/*.py` helpers with stdlib Python equivalents
-- Added `python-docx` as alternative editing layer (simpler than raw XML for common tasks)
-- Windows-native install paths (winget/npm/pip)
-- No dependency on Claude Code runtime scripts
+**Scripts:** All official `scripts/` are included — `unpack.py`, `pack.py`, `soffice.py`, `validate.py`, `comment.py`, `accept_changes.py`, plus helpers and templates. They work identically to the Claude Code originals.
+
+**Python Alternative:** `python-docx` is also available for simpler tasks where raw XML editing is overkill.
+
+**Dependencies on Windows:**
+- `npm install -g docx` for docx-js
+- `winget install pandoc` for text extraction
+- `pip install python-docx` for simple editing
+- `winget install LibreOffice.LibreOffice` (optional) for .doc conversion and tracked changes acceptance
