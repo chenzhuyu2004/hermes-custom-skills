@@ -9,11 +9,12 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from office.soffice import get_soffice_env
+from office.soffice import get_soffice_env, find_soffice
 
 logger = logging.getLogger(__name__)
 
-LIBREOFFICE_PROFILE = "/tmp/libreoffice_docx_profile"
+import tempfile
+LIBREOFFICE_PROFILE = str(Path(tempfile.gettempdir()) / "libreoffice_docx_profile")
 MACRO_DIR = f"{LIBREOFFICE_PROFILE}/user/basic/Standard"
 
 ACCEPT_CHANGES_MACRO = """<?xml version="1.0" encoding="UTF-8"?>
@@ -56,7 +57,7 @@ def accept_changes(
         return None, "Error: Failed to setup LibreOffice macro"
 
     cmd = [
-        "soffice",
+        find_soffice(),
         "--headless",
         f"-env:UserInstallation=file://{LIBREOFFICE_PROFILE}",
         "--norestore",
@@ -98,7 +99,7 @@ def _setup_libreoffice_macro() -> bool:
     if not macro_dir.exists():
         subprocess.run(
             [
-                "soffice",
+                find_soffice(),
                 "--headless",
                 f"-env:UserInstallation=file://{LIBREOFFICE_PROFILE}",
                 "--terminate_after_init",

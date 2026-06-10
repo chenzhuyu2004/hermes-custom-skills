@@ -34,7 +34,22 @@ def get_soffice_env() -> dict:
 
 def run_soffice(args: list[str], **kwargs) -> subprocess.CompletedProcess:
     env = get_soffice_env()
-    return subprocess.run(["soffice"] + args, env=env, **kwargs)
+    soffice_cmd = find_soffice()
+    return subprocess.run([soffice_cmd] + args, env=env, **kwargs)
+
+
+def find_soffice() -> str:
+    """Find the soffice executable. Returns full path on Windows, 'soffice' on Unix."""
+    import sys
+    if sys.platform == "win32":
+        candidates = [
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        ]
+        for path in candidates:
+            if Path(path).exists():
+                return path
+    return "soffice"
 
 
 
@@ -42,11 +57,19 @@ _SHIM_SO = Path(tempfile.gettempdir()) / "lo_socket_shim.so"
 
 
 def _needs_shim() -> bool:
+    """Check if AF_UNIX socket shim is needed.
+    
+    On Windows, AF_UNIX is not available and the shim is never needed.
+    On Linux/macOS, the shim is needed if sandboxing blocks AF_UNIX sockets.
+    """
+    import sys
+    if sys.platform == "win32":
+        return False
     try:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.close()
         return False
-    except OSError:
+    except (OSError, AttributeError):
         return True
 
 
