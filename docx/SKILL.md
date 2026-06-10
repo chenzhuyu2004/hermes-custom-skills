@@ -18,18 +18,39 @@ metadata:
 
 A .docx file is a ZIP archive containing XML files. This skill covers creating new Word documents, editing existing ones with tracked changes and comments, and extracting/analyzing content.
 
+## Setup (Windows)
+
+All required dependencies and their Windows install methods:
+
+```bash
+# Required
+npm install -g docx                          # docx-js (create new documents)
+winget install pandoc                         # text extraction
+pip install python-docx defusedxml lxml       # Python libraries
+
+# Optional but recommended
+winget install TheDocumentFoundation.LibreOffice  # .doc conversion, tracked changes
+winget install oschwartz10612.Poppler             # pdftoppm (page images)
+```
+
+Verify:
+```bash
+pandoc --version      # ≥ 3.x
+npm list -g docx      # ≥ 9.x
+python -c "import docx, defusedxml, lxml; print('OK')"
+soffice --version 2>/dev/null || echo "LibreOffice: optional (soffice not in PATH, auto-detected)"
+```
+
 ## Quick Reference
 
 | Task | Approach |
 |------|----------|
 | Read/analyze content | `pandoc` or unpack for raw XML |
-| Create new document | Use `docx-js` (JavaScript) — see [Creating New Documents](#creating-new-documents) |
+| Create new document | `docx-js` (JavaScript) — see [Creating New Documents](#creating-new-documents) |
 | Edit existing document | Unpack → edit XML → repack — see [Editing Existing Documents](#editing-existing-documents) |
 | Accept tracked changes | `python scripts/accept_changes.py` (requires LibreOffice) |
 
-> **Script path:** All `python scripts/...` commands use the official Anthropic scripts included with this skill.
-> In Hermes, the skill directory is `%LOCALAPPDATA%\hermes\skills\productivity\docx\`.
-> Run commands from that directory, or use the `$HERMES_SKILL_DIR` variable when available.
+> **Windows note:** Run `python scripts/...` commands from the skill directory. The skill directory is auto-detected by Hermes. If running manually, `cd` to `%LOCALAPPDATA%\hermes\skills\productivity\docx\` first. All official scripts auto-detect LibreOffice and handle Windows-specific quirks (AF_UNIX sockets, temp paths).
 
 ### Converting .doc to .docx
 
